@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevBoard / Code & Post Hub</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            900: '#312e81',
+                        },
+                        darkbg: '#0f172a',
+                        darkcard: '#1e293b',
+                        darkborder: '#334155'
+                    },
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'Fira Code', 'Monaco', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        .code-input {
+            font-family: 'JetBrains Mono', monospace;
+            tab-size: 2;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-900 text-slate-100 antialiased selection:bg-brand-500 selection:text-white">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Navigation Header -->
+    <header class="sticky top-0 z-40 w-full border-b border-slate-800 bg-slate-900/80 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-brand-600 rounded-lg text-white font-mono font-bold shadow-lg shadow-brand-500/20">
+                        &lt;/&gt;
+                    </div>
+                    <div>
+                        <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">DevBoard</span>
+                        <span class="ml-2 text-xs font-medium px-2 py-0.5 rounded bg-brand-500/10 text-brand-400 border border-brand-500/20">Code & Post Hub</span>
+                    </div>
+                </div>
+                
+                <!-- Main Nav Tabs -->
+                <nav class="flex space-x-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700/50">
+                    <button id="nav-feed-btn" onclick="switchMainTab('feed')" class="flex items-center space-x-2 px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-brand-600 text-white shadow-md">
+                        <i data-lucide="message-square" class="w-4 h-4"></i>
+                        <span>掲示板</span>
+                    </button>
+                    <button id="nav-codepen-btn" onclick="switchMainTab('codepen')" class="flex items-center space-x-2 px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium rounded-lg text-slate-400 hover:text-slate-200 transition-all duration-200">
+                        <i data-lucide="code" class="w-4 h-4"></i>
+                        <span>Playground</span>
+                    </button>
+                    <button id="nav-backup-btn" onclick="switchMainTab('backup')" class="flex items-center space-x-2 px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium rounded-lg text-slate-400 hover:text-slate-200 transition-all duration-200">
+                        <i data-lucide="database" class="w-4 h-4"></i>
+                        <span>データ管理</span>
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Body -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- TAB 1: BULLETIN BOARD FEED -->
+        <section id="tab-feed" class="space-y-8">
+            
+            <!-- Post Creation Card -->
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6 shadow-xl backdrop-blur-sm transition-all duration-300 hover:border-slate-600">
+                <h2 class="text-lg font-semibold text-slate-100 flex items-center space-x-2 mb-4">
+                    <i data-lucide="edit-3" class="w-5 h-5 text-brand-400"></i>
+                    <span>新しいトピックを投稿する</span>
+                </h2>
+                
+                <form id="create-post-form" class="space-y-4" onsubmit="handleCreatePost(event)">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">投稿者名 *</label>
+                            <input type="text" id="post-author" required placeholder="例: 開発初心者太郎" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">タイトル *</label>
+                            <input type="text" id="post-title" required placeholder="例: JavaScriptの非同期処理について" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">本文（URLは自動的にリンク化されます） *</label>
+                        <textarea id="post-body" rows="3" required placeholder="メッセージや質問を入力してください... https://github.com などのURLも自動リンク化されます。" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-4 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all resize-y"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">タグ (カンマ区切り)</label>
+                        <input type="text" id="post-tags" placeholder="例: JavaScript, CSS, 初心者" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all">
+                    </div>
+
+                    <!-- Code Attachment Toggle -->
+                    <div class="border-t border-slate-700/50 pt-4">
+                        <button type="button" onclick="togglePostCodeEditor()" class="flex items-center space-x-2 text-sm text-brand-400 hover:text-brand-300 font-medium transition-colors">
+                            <i data-lucide="code-2" class="w-4 h-4"></i>
+                            <span id="code-editor-toggle-text">+ CodePen風のコードを添付する</span>
+                        </button>
+
+                        <div id="post-code-container" class="hidden mt-4 space-y-4 bg-slate-900/80 p-4 rounded-xl border border-slate-700/80">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">ライブコードエディタ</span>
+                                <button type="button" onclick="updatePostCodePreview()" class="text-xs bg-brand-600 hover:bg-brand-500 text-white font-medium px-3 py-1 rounded-lg flex items-center space-x-1 transition-all">
+                                    <i data-lucide="play" class="w-3 h-3"></i>
+                                    <span>プレビュー更新</span>
+                                </button>
+                            </div>
+
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                                <div>
+                                    <span class="block text-xs font-mono text-orange-400 mb-1">HTML</span>
+                                    <textarea id="post-code-html" rows="4" placeholder="<button class='btn'>Click</button>" class="code-input w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-orange-500 resize-none" oninput="updatePostCodePreview()"></textarea>
+                                </div>
+                                <div>
+                                    <span class="block text-xs font-mono text-blue-400 mb-1">CSS</span>
+                                    <textarea id="post-code-css" rows="4" placeholder=".btn { background: #6366f1; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }" class="code-input w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none" oninput="updatePostCodePreview()"></textarea>
+                                </div>
+                                <div>
+                                    <span class="block text-xs font-mono text-yellow-400 mb-1">JavaScript</span>
+                                    <textarea id="post-code-js" rows="4" placeholder="document.querySelector('.btn').onclick = () => alert('Hello!');" class="code-input w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-yellow-500 resize-none" oninput="updatePostCodePreview()"></textarea>
+                                </div>
+                            </div>
+
+                            <div>
+                                <span class="block text-xs font-mono text-slate-400 mb-1">プレビュー表示領域</span>
+                                <div class="bg-white rounded-lg overflow-hidden h-36 border border-slate-700">
+                                    <iframe id="post-code-iframe" class="w-full h-full border-none"></iframe>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end pt-2">
+                        <button type="submit" class="bg-brand-600 hover:bg-brand-500 text-white font-medium px-6 py-2.5 rounded-xl shadow-lg shadow-brand-500/25 flex items-center space-x-2 transition-all transform active:scale-95">
+                            <i data-lucide="send" class="w-4 h-4"></i>
+                            <span>投稿する</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Feed Search and Filter Controls -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-800/40 p-4 rounded-xl border border-slate-700/50">
+                <div class="relative w-full sm:w-72">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+                    <input type="text" id="feed-search-input" oninput="renderPosts()" placeholder="投稿やコードを検索..." class="w-full bg-slate-900 border border-slate-700/80 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                </div>
+
+                <div class="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-end">
+                    <span id="post-count-badge" class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full border border-slate-700">0 件の投稿</span>
+                </div>
+            </div>
+
+            <!-- Container where posts will be rendered -->
+            <div id="posts-container" class="space-y-6"></div>
+        </section>
+
+        <!-- TAB 2: STANDALONE CODEPEN PLAYGROUND -->
+        <section id="tab-codepen" class="hidden space-y-6">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6 shadow-xl backdrop-blur-sm">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-100 flex items-center space-x-2">
+                            <i data-lucide="terminal" class="w-5 h-5 text-brand-400"></i>
+                            <span>Code Playground (CodePen風)</span>
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-1">HTML, CSS, JavaScriptをリアルタイムに試せる環境です。</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button onclick="resetPlaygroundCode()" class="px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-200 border border-slate-700 rounded-lg bg-slate-900 transition-colors flex items-center space-x-1">
+                            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                            <span>リセット</span>
+                        </button>
+                        <button onclick="runPlaygroundCode()" class="px-4 py-1.5 text-xs font-medium text-white bg-brand-600 hover:bg-brand-500 rounded-lg shadow-md transition-all flex items-center space-x-1">
+                            <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                            <span>実行 / 更新</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+                    <div class="flex flex-col bg-slate-900 rounded-xl border border-slate-700/80 overflow-hidden">
+                        <div class="bg-slate-950 px-4 py-2 border-b border-slate-800 flex justify-between items-center">
+                            <span class="text-xs font-mono font-semibold text-orange-400">HTML</span>
+                        </div>
+                        <textarea id="standalone-html" class="code-input flex-grow w-full bg-slate-900 p-3 text-xs text-slate-200 focus:outline-none resize-none h-48" placeholder="<h1>Hello</h1>" oninput="runPlaygroundCode()"></textarea>
+                    </div>
+
+                    <div class="flex flex-col bg-slate-900 rounded-xl border border-slate-700/80 overflow-hidden">
+                        <div class="bg-slate-950 px-4 py-2 border-b border-slate-800 flex justify-between items-center">
+                            <span class="text-xs font-mono font-semibold text-blue-400">CSS</span>
+                        </div>
+                        <textarea id="standalone-css" class="code-input flex-grow w-full bg-slate-900 p-3 text-xs text-slate-200 focus:outline-none resize-none h-48" placeholder="h1 { color: red; }" oninput="runPlaygroundCode()"></textarea>
+                    </div>
+
+                    <div class="flex flex-col bg-slate-900 rounded-xl border border-slate-700/80 overflow-hidden">
+                        <div class="bg-slate-950 px-4 py-2 border-b border-slate-800 flex justify-between items-center">
+                            <span class="text-xs font-mono font-semibold text-yellow-400">JavaScript</span>
+                        </div>
+                        <textarea id="standalone-js" class="code-input flex-grow w-full bg-slate-900 p-3 text-xs text-slate-200 focus:outline-none resize-none h-48" placeholder="console.log('test');" oninput="runPlaygroundCode()"></textarea>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="block text-xs font-mono font-semibold text-slate-400 mb-2">レンダリング結果</span>
+                    <div class="bg-white rounded-xl overflow-hidden h-72 border border-slate-700 shadow-inner">
+                        <iframe id="standalone-iframe" class="w-full h-full border-none"></iframe>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: DATA IMPORT & EXPORT MANAGEMENT -->
+        <section id="tab-backup" class="hidden space-y-6 max-w-4xl mx-auto">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6 shadow-xl backdrop-blur-sm space-y-6">
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-100 flex items-center space-x-2">
+                        <i data-lucide="database" class="w-5 h-5 text-brand-400"></i>
+                        <span>データ管理（インポート / エクスポート）</span>
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">掲示板のデータ（投稿・コメント・Playgroundデータ）をJSONファイルとしてダウンロード・バックアップおよび復元できます。</p>
+                </div>
+
+                <!-- Export Block -->
+                <div class="bg-slate-900/80 p-5 rounded-xl border border-slate-700/80 space-y-3">
+                    <div class="flex items-center space-x-2 text-slate-200 font-medium text-sm">
+                        <i data-lucide="download" class="w-4 h-4 text-emerald-400"></i>
+                        <span>データをエクスポート (バックアップ保存)</span>
+                    </div>
+                    <p class="text-xs text-slate-400">現在の全投稿と設定を `devboard-backup.json` というファイル名でダウンロードします。</p>
+                    <button onclick="exportDataJSON()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-xl shadow-md transition-all flex items-center space-x-2">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        <span>JSONファイルをダウンロード</span>
+                    </button>
+                </div>
+
+                <!-- Import Block -->
+                <div class="bg-slate-900/80 p-5 rounded-xl border border-slate-700/80 space-y-4">
+                    <div class="flex items-center space-x-2 text-slate-200 font-medium text-sm">
+                        <i data-lucide="upload" class="w-4 h-4 text-brand-400"></i>
+                        <span>データをインポート (復元・統合)</span>
+                    </div>
+                    <p class="text-xs text-slate-400">保存した JSON バックアップファイルを取り込みます。</p>
+
+                    <!-- Drag & Drop Zone -->
+                    <div id="drop-zone" onclick="document.getElementById('import-file-input').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleFileDrop(event)" class="border-2 border-dashed border-slate-700 hover:border-brand-500 rounded-xl p-8 text-center cursor-pointer transition-colors bg-slate-950/40">
+                        <i data-lucide="file-up" class="w-8 h-8 text-slate-500 mx-auto mb-2"></i>
+                        <p class="text-xs text-slate-300 font-medium">クリックしてJSONファイルを選択、またはドラッグ＆ドロップ</p>
+                        <p class="text-[10px] text-slate-500 mt-1">.json 拡張子のバックアップファイルに対応</p>
+                        <input type="file" id="import-file-input" accept=".json" class="hidden" onchange="handleFileSelect(event)">
+                    </div>
+
+                    <!-- Import Mode Options -->
+                    <div class="flex items-center space-x-6 pt-2">
+                        <label class="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer">
+                            <input type="radio" name="import-mode" value="merge" checked class="text-brand-600 focus:ring-brand-500">
+                            <span>既存の投稿に追加（統合）</span>
+                        </label>
+                        <label class="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer">
+                            <input type="radio" name="import-mode" value="overwrite" class="text-brand-600 focus:ring-brand-500">
+                            <span>既存の投稿を全削除して上書き</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Reset Data -->
+                <div class="border-t border-slate-700/50 pt-4 flex justify-between items-center">
+                    <span class="text-xs text-slate-500">初期サンプルデータに戻したい場合</span>
+                    <button onclick="resetToSampleData()" class="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-medium rounded-lg transition-colors flex items-center space-x-1">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                        <span>データを初期リセット</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal for Editing Posts -->
+    <div id="edit-post-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+                <h3 class="text-md font-semibold text-slate-200 flex items-center space-x-2">
+                    <i data-lucide="edit" class="w-5 h-5 text-brand-400"></i>
+                    <span>投稿の編集</span>
+                </h3>
+                <button onclick="closeEditPostModal()" class="text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-slate-800">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <form onsubmit="handleSavePostEdit(event)" class="p-6 overflow-y-auto space-y-4">
+                <input type="hidden" id="edit-post-id">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">投稿者名</label>
+                    <input type="text" id="edit-post-author" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-200 focus:ring-1 focus:ring-brand-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">タイトル</label>
+                    <input type="text" id="edit-post-title" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-200 focus:ring-1 focus:ring-brand-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">本文</label>
+                    <textarea id="edit-post-body" rows="4" required class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 focus:ring-1 focus:ring-brand-500 resize-y"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">タグ (カンマ区切り)</label>
+                    <input type="text" id="edit-post-tags" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-200 focus:ring-1 focus:ring-brand-500">
+                </div>
+
+                <!-- Code Attachment Snippets -->
+                <div class="border-t border-slate-800 pt-4 space-y-3">
+                    <span class="block text-xs font-mono font-semibold text-slate-400">添付コードの編集</span>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <div>
+                            <span class="text-[10px] font-mono text-orange-400 block mb-1">HTML</span>
+                            <textarea id="edit-post-code-html" rows="3" class="code-input w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-300"></textarea>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-mono text-blue-400 block mb-1">CSS</span>
+                            <textarea id="edit-post-code-css" rows="3" class="code-input w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-300"></textarea>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-mono text-yellow-400 block mb-1">JavaScript</span>
+                            <textarea id="edit-post-code-js" rows="3" class="code-input w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-300"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-4">
+                    <button type="button" onclick="closeEditPostModal()" class="px-4 py-2 text-xs text-slate-400 hover:text-slate-200">キャンセル</button>
+                    <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-medium shadow-md">保存する</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Fullscreen Code Runner Viewer Modal -->
+    <div id="code-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+                <h3 class="text-md font-semibold text-slate-200 flex items-center space-x-2">
+                    <i data-lucide="code-2" class="w-5 h-5 text-brand-400"></i>
+                    <span id="modal-title">コードの実行結果 & ソースコード</span>
+                </h3>
+                <button onclick="closeCodeModal()" class="text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-slate-800">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto space-y-6 flex-grow">
+                <div>
+                    <span class="block text-xs font-mono text-slate-400 mb-2">ライブプレビュー</span>
+                    <div class="bg-white rounded-xl overflow-hidden h-64 border border-slate-700">
+                        <iframe id="modal-iframe" class="w-full h-full border-none"></iframe>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <span class="block text-xs font-mono text-slate-400">ソースコード</span>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <span class="text-xs font-mono text-orange-400 block mb-1">HTML</span>
+                            <pre id="modal-html" class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-slate-300 overflow-x-auto max-h-40 border border-slate-800"></pre>
+                        </div>
+                        <div>
+                            <span class="text-xs font-mono text-blue-400 block mb-1">CSS</span>
+                            <pre id="modal-css" class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-slate-300 overflow-x-auto max-h-40 border border-slate-800"></pre>
+                        </div>
+                        <div>
+                            <span class="text-xs font-mono text-yellow-400 block mb-1">JS</span>
+                            <pre id="modal-js" class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-slate-300 overflow-x-auto max-h-40 border border-slate-800"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 py-6 mt-12 bg-slate-950/50">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
+            <p>DevBoard &copy; GitHub Pages Standard LocalStorage Engine</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript Application Core -->
+    <script>
+        const STORAGE_KEY = 'devboard_posts_data_v2';
+
+        const SAMPLE_POSTS = [
+            {
+                id: 'sample-1',
+                author: 'Web職人',
+                title: 'GitHub Pagesで動くアニメーションボタンを作りました！',
+                body: 'HTMLとCSSでネオン風ボタンを作ってみました。詳細情報はこちら: https://developer.mozilla.org',
+                tags: ['CSS', 'デザイン', 'ボタン'],
+                timestamp: new Date(Date.now() - 3600000 * 2).toISOString(),
+                editedAt: null,
+                likes: 5,
+                code: {
+                    html: '<button class="neon-btn">Glow Button</button>',
+                    css: 'body { background: #0f172a; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }\n.neon-btn {\n  background: #6366f1;\n  color: white;\n  padding: 12px 28px;\n  font-size: 16px;\n  border: none;\n  border-radius: 8px;\n  box-shadow: 0 0 15px rgba(99, 102, 241, 0.6);\n  cursor: pointer;\n  transition: all 0.3s ease;\n}\n.neon-btn:hover {\n  box-shadow: 0 0 25px rgba(99, 102, 241, 0.9);\n  transform: translateY(-2px);\n}',
+                    js: 'document.querySelector(".neon-btn").onclick = () => alert("Button Clicked!");'
+                },
+                comments: [
+                    { id: 'c1', author: 'プログラミング学習中', text: 'とても綺麗ですね！参考にさせていただきます。', timestamp: new Date(Date.now() - 1800000).toISOString() }
+                ]
+            },
+            {
+                id: 'sample-2',
+                author: 'GitHubファン',
+                title: '自動リンク検出機能とデータ管理機能',
+                body: '投稿内のURL（https://docs.github.com/ja）が自動リンク化されます。また、右上の「データ管理」からJSONの保存・読み込みが可能です！',
+                tags: ['GitHub', 'お知らせ'],
+                timestamp: new Date(Date.now() - 3600000 * 5).toISOString(),
+                editedAt: null,
+                likes: 3,
+                code: null,
+                comments: []
+            }
+        ];
+
+        let posts = [];
+        let isCodeEditorOpen = false;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            loadPosts();
+            renderPosts();
+            initStandalonePlayground();
+        });
+
+        // Toast Notification System
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgClass = type === 'error' ? 'bg-rose-600' : 'bg-brand-600';
+            
+            toast.className = `${bgClass} text-white px-4 py-3 rounded-xl shadow-xl text-xs font-medium flex items-center space-x-2 transition-all transform translate-y-2 opacity-0 pointer-events-auto`;
+            toast.innerHTML = `<i data-lucide="${type === 'error' ? 'alert-circle' : 'check-circle'}" class="w-4 h-4"></i><span>${escapeHTML(message)}</span>`;
+            
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function loadPosts() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                try {
+                    posts = JSON.parse(stored);
+                } catch (e) {
+                    posts = SAMPLE_POSTS;
+                }
+            } else {
+                posts = SAMPLE_POSTS;
+                savePosts();
+            }
+        }
+
+        function savePosts() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(posts));
+        }
+
+        function parseUrlsToLinks(text) {
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            return text.replace(urlRegex, (url) => {
+                return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-brand-400 hover:text-brand-300 underline underline-offset-2 font-medium">${url}</a>`;
+            });
+        }
+
+        function togglePostCodeEditor() {
+            const container = document.getElementById('post-code-container');
+            const toggleText = document.getElementById('code-editor-toggle-text');
+            isCodeEditorOpen = !isCodeEditorOpen;
+
+            if (isCodeEditorOpen) {
+                container.classList.remove('hidden');
+                toggleText.innerText = '- コード添付を取り消す';
+                updatePostCodePreview();
+            } else {
+                container.classList.add('hidden');
+                toggleText.innerText = '+ CodePen風のコードを添付する';
+            }
+        }
+
+        function updatePostCodePreview() {
+            const html = document.getElementById('post-code-html').value || '';
+            const css = document.getElementById('post-code-css').value || '';
+            const js = document.getElementById('post-code-js').value || '';
+            
+            const iframe = document.getElementById('post-code-iframe');
+            renderIntoIframe(iframe, html, css, js);
+        }
+
+        function renderIntoIframe(iframe, html, css, js) {
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            const content = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>${css}</style>
+                </head>
+                <body>
+                    ${html}
+                    <script>
+                        try {
+                            ${js}
+                        } catch(err) {
+                            console.error(err);
+                        }
+                    <\/script>
+                </body>
+                </html>
+            `;
+            doc.open();
+            doc.write(content);
+            doc.close();
+        }
+
+        function handleCreatePost(e) {
+            e.preventDefault();
+
+            const author = document.getElementById('post-author').value.trim();
+            const title = document.getElementById('post-title').value.trim();
+            const body = document.getElementById('post-body').value.trim();
+            const rawTags = document.getElementById('post-tags').value.trim();
+            const tags = rawTags ? rawTags.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+            let codeData = null;
+            if (isCodeEditorOpen) {
+                codeData = {
+                    html: document.getElementById('post-code-html').value,
+                    css: document.getElementById('post-code-css').value,
+                    js: document.getElementById('post-code-js').value
+                };
+            }
+
+            const newPost = {
+                id: 'post-' + Date.now(),
+                author,
+                title,
+                body,
+                tags,
+                timestamp: new Date().toISOString(),
+                editedAt: null,
+                likes: 0,
+                code: codeData,
+                comments: []
+            };
+
+            posts.unshift(newPost);
+            savePosts();
+            renderPosts();
+
+            document.getElementById('create-post-form').reset();
+            if (isCodeEditorOpen) togglePostCodeEditor();
+            showToast('トピックを新規投稿しました');
+        }
+
+        // Render Posts
+        function renderPosts() {
+            const container = document.getElementById('posts-container');
+            const badge = document.getElementById('post-count-badge');
+            const searchQuery = (document.getElementById('feed-search-input')?.value || '').toLowerCase();
+
+            let filteredPosts = posts.filter(post => {
+                const titleMatch = post.title.toLowerCase().includes(searchQuery);
+                const bodyMatch = post.body.toLowerCase().includes(searchQuery);
+                const authorMatch = post.author.toLowerCase().includes(searchQuery);
+                const tagMatch = post.tags && post.tags.some(t => t.toLowerCase().includes(searchQuery));
+                return titleMatch || bodyMatch || authorMatch || tagMatch;
+            });
+
+            badge.innerText = `${filteredPosts.length} 件の投稿`;
+
+            if (filteredPosts.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 bg-slate-800/30 rounded-2xl border border-dashed border-slate-700">
+                        <i data-lucide="inbox" class="w-10 h-10 text-slate-500 mx-auto mb-2"></i>
+                        <p class="text-slate-400 text-sm">該当する投稿がありません。</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            container.innerHTML = filteredPosts.map(post => {
+                const formattedTime = new Date(post.timestamp).toLocaleString('ja-JP', {
+                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                });
+
+                const editedLabel = post.editedAt ? ` <span class="text-amber-400 text-[10px] ml-1">(編集済み)</span>` : '';
+
+                const formattedBody = parseUrlsToLinks(
+                    escapeHTML(post.body).replace(/\n/g, '<br>')
+                );
+
+                const hasCode = post.code && (post.code.html || post.code.css || post.code.js);
+
+                return `
+                    <article class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6 shadow-xl space-y-4 backdrop-blur-sm transition-all hover:border-slate-600">
+                        <div class="flex items-start justify-between">
+                            <div class="space-y-1">
+                                <div class="flex items-center space-x-2">
+                                    <span class="font-semibold text-slate-200 text-sm">${escapeHTML(post.author)}</span>
+                                    <span class="text-slate-500 text-xs">• ${formattedTime}${editedLabel}</span>
+                                </div>
+                                <h3 class="text-lg font-bold text-slate-100 tracking-tight">${escapeHTML(post.title)}</h3>
+                            </div>
+                            
+                            <!-- Action Buttons: Edit & Delete -->
+                            <div class="flex items-center space-x-1">
+                                <button onclick="openEditPostModal('${post.id}')" class="text-slate-400 hover:text-brand-400 p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors" title="編集">
+                                    <i data-lucide="edit" class="w-4 h-4"></i>
+                                </button>
+                                <button onclick="deletePost('${post.id}')" class="text-slate-400 hover:text-rose-400 p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors" title="削除">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Post Body -->
+                        <div class="text-sm text-slate-300 leading-relaxed break-words">
+                            ${formattedBody}
+                        </div>
+
+                        <!-- Tags -->
+                        ${post.tags && post.tags.length > 0 ? `
+                            <div class="flex flex-wrap gap-1.5 pt-1">
+                                ${post.tags.map(tag => `<span class="bg-slate-700/50 text-slate-300 text-[11px] px-2.5 py-0.5 rounded-md border border-slate-600/50">#${escapeHTML(tag)}</span>`).join('')}
+                            </div>
+                        ` : ''}
+
+                        <!-- Code Preview Button -->
+                        ${hasCode ? `
+                            <div class="bg-slate-900/90 rounded-xl p-4 border border-slate-700/80 flex items-center justify-between">
+                                <div class="flex items-center space-x-2 text-xs font-mono text-brand-400">
+                                    <i data-lucide="code-2" class="w-4 h-4"></i>
+                                    <span>添付コードあり (HTML/CSS/JS)</span>
+                                </div>
+                                <button onclick="openCodeModal('${post.id}')" class="px-3 py-1.5 bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 text-xs font-medium rounded-lg border border-brand-500/30 flex items-center space-x-1 transition-all">
+                                    <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                                    <span>コード実行 & 閲覧</span>
+                                </button>
+                            </div>
+                        ` : ''}
+
+                        <!-- Post Footer Actions -->
+                        <div class="flex items-center justify-between pt-3 border-t border-slate-700/50 text-xs">
+                            <div class="flex items-center space-x-4">
+                                <button onclick="likePost('${post.id}')" class="flex items-center space-x-1.5 text-slate-400 hover:text-rose-400 transition-colors group">
+                                    <i data-lucide="heart" class="w-4 h-4 group-hover:scale-110 transition-transform"></i>
+                                    <span>${post.likes}</span>
+                                </button>
+                                <button onclick="toggleComments('${post.id}')" class="flex items-center space-x-1.5 text-slate-400 hover:text-brand-400 transition-colors">
+                                    <i data-lucide="message-circle" class="w-4 h-4"></i>
+                                    <span>コメント (${post.comments.length})</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Comments Section Drawer -->
+                        <div id="comments-thread-${post.id}" class="hidden pt-4 space-y-4 border-t border-slate-700/40">
+                            <div class="space-y-3">
+                                ${post.comments.map(c => `
+                                    <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-800 text-xs space-y-1">
+                                        <div class="flex justify-between items-center text-slate-400">
+                                            <span class="font-medium text-slate-300">${escapeHTML(c.author)}</span>
+                                            <span class="text-[10px] text-slate-500">${new Date(c.timestamp).toLocaleString('ja-JP')}</span>
+                                        </div>
+                                        <p class="text-slate-300">${escapeHTML(c.text)}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+
+                            <form onsubmit="handleAddComment(event, '${post.id}')" class="flex flex-col sm:flex-row gap-2 pt-2">
+                                <input type="text" placeholder="名前" required class="comment-author-input sm:w-1/3 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                                <input type="text" placeholder="コメントを追加..." required class="comment-text-input flex-grow bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                                <button type="submit" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-1.5 rounded-lg text-xs font-medium transition-colors">送信</button>
+                            </form>
+                        </div>
+                    </article>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        // Post Editing Functions
+        function openEditPostModal(postId) {
+            const post = posts.find(p => p.id === postId);
+            if (!post) return;
+
+            document.getElementById('edit-post-id').value = post.id;
+            document.getElementById('edit-post-author').value = post.author;
+            document.getElementById('edit-post-title').value = post.title;
+            document.getElementById('edit-post-body').value = post.body;
+            document.getElementById('edit-post-tags').value = post.tags ? post.tags.join(', ') : '';
+
+            document.getElementById('edit-post-code-html').value = post.code?.html || '';
+            document.getElementById('edit-post-code-css').value = post.code?.css || '';
+            document.getElementById('edit-post-code-js').value = post.code?.js || '';
+
+            document.getElementById('edit-post-modal').classList.remove('hidden');
+        }
+
+        function closeEditPostModal() {
+            document.getElementById('edit-post-modal').classList.add('hidden');
+        }
+
+        function handleSavePostEdit(e) {
+            e.preventDefault();
+            const postId = document.getElementById('edit-post-id').value;
+            const post = posts.find(p => p.id === postId);
+
+            if (post) {
+                post.author = document.getElementById('edit-post-author').value.trim();
+                post.title = document.getElementById('edit-post-title').value.trim();
+                post.body = document.getElementById('edit-post-body').value.trim();
+                
+                const rawTags = document.getElementById('edit-post-tags').value.trim();
+                post.tags = rawTags ? rawTags.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+                const html = document.getElementById('edit-post-code-html').value;
+                const css = document.getElementById('edit-post-code-css').value;
+                const js = document.getElementById('edit-post-code-js').value;
+
+                if (html || css || js) {
+                    post.code = { html, css, js };
+                } else {
+                    post.code = null;
+                }
+
+                post.editedAt = new Date().toISOString();
+
+                savePosts();
+                renderPosts();
+                closeEditPostModal();
+                showToast('投稿内容を更新しました');
+            }
+        }
+
+        // Export JSON Data
+        function exportDataJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(posts, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `devboard-backup-${new Date().toISOString().slice(0, 10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast('JSONデータのダウンロードを開始しました');
+        }
+
+        // Import Drag & Drop Handlers
+        function handleDragOver(e) {
+            e.preventDefault();
+            document.getElementById('drop-zone').classList.add('border-brand-500', 'bg-slate-900/60');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            document.getElementById('drop-zone').classList.remove('border-brand-500', 'bg-slate-900/60');
+        }
+
+        function handleFileDrop(e) {
+            e.preventDefault();
+            document.getElementById('drop-zone').classList.remove('border-brand-500', 'bg-slate-900/60');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                processImportFile(files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                processImportFile(files[0]);
+            }
+        }
+
+        function processImportFile(file) {
+            if (!file.name.endsWith('.json')) {
+                showToast('JSONファイルのみ読み込み可能です', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const importedData = JSON.parse(event.target.result);
+                    if (!Array.isArray(importedData)) {
+                        throw new Error('配列フォーマットではありません');
+                    }
+
+                    const mode = document.querySelector('input[name="import-mode"]:checked').value;
+                    if (mode === 'overwrite') {
+                        posts = importedData;
+                    } else {
+                        // Merge without duplicate IDs
+                        const existingIds = new Set(posts.map(p => p.id));
+                        importedData.forEach(item => {
+                            if (!existingIds.has(item.id)) {
+                                posts.push(item);
+                            }
+                        });
+                    }
+
+                    savePosts();
+                    renderPosts();
+                    showToast('データのインポートが完了しました！');
+                } catch (err) {
+                    showToast('不正なJSONファイル形式です', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function resetToSampleData() {
+            if (confirm('すべてのデータを取り消して初期状態に戻しますか？')) {
+                posts = SAMPLE_POSTS;
+                savePosts();
+                renderPosts();
+                showToast('初期サンプルデータにリセットしました');
+            }
+        }
+
+        function likePost(postId) {
+            const post = posts.find(p => p.id === postId);
+            if (post) {
+                post.likes += 1;
+                savePosts();
+                renderPosts();
+            }
+        }
+
+        function deletePost(postId) {
+            if (confirm('この投稿を削除してもよろしいですか？')) {
+                posts = posts.filter(p => p.id !== postId);
+                savePosts();
+                renderPosts();
+                showToast('投稿を削除しました');
+            }
+        }
+
+        function toggleComments(postId) {
+            const drawer = document.getElementById(`comments-thread-${postId}`);
+            if (drawer) {
+                drawer.classList.toggle('hidden');
+            }
+        }
+
+        function handleAddComment(e, postId) {
+            e.preventDefault();
+            const form = e.target;
+            const authorInput = form.querySelector('.comment-author-input');
+            const textInput = form.querySelector('.comment-text-input');
+
+            const post = posts.find(p => p.id === postId);
+            if (post) {
+                post.comments.push({
+                    id: 'comment-' + Date.now(),
+                    author: authorInput.value.trim(),
+                    text: textInput.value.trim(),
+                    timestamp: new Date().toISOString()
+                });
+                savePosts();
+                renderPosts();
+                setTimeout(() => toggleComments(postId), 50);
+                showToast('コメントを送信しました');
+            }
+        }
+
+        function openCodeModal(postId) {
+            const post = posts.find(p => p.id === postId);
+            if (!post || !post.code) return;
+
+            document.getElementById('modal-title').innerText = `${post.title} — コード実行結果`;
+            document.getElementById('modal-html').innerText = post.code.html || '<!-- なし -->';
+            document.getElementById('modal-css').innerText = post.code.css || '/* なし */';
+            document.getElementById('modal-js').innerText = post.code.js || '// なし';
+
+            const modalIframe = document.getElementById('modal-iframe');
+            renderIntoIframe(modalIframe, post.code.html, post.code.css, post.code.js);
+
+            document.getElementById('code-modal').classList.remove('hidden');
+        }
+
+        function closeCodeModal() {
+            document.getElementById('code-modal').classList.add('hidden');
+        }
+
+        function switchMainTab(tab) {
+            const feedBtn = document.getElementById('nav-feed-btn');
+            const codepenBtn = document.getElementById('nav-codepen-btn');
+            const backupBtn = document.getElementById('nav-backup-btn');
+
+            const feedTab = document.getElementById('tab-feed');
+            const codepenTab = document.getElementById('tab-codepen');
+            const backupTab = document.getElementById('tab-backup');
+
+            [feedTab, codepenTab, backupTab].forEach(t => t.classList.add('hidden'));
+            [feedBtn, codepenBtn, backupBtn].forEach(b => b.className = 'flex items-center space-x-2 px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium rounded-lg text-slate-400 hover:text-slate-200 transition-all duration-200');
+
+            if (tab === 'feed') {
+                feedTab.classList.remove('hidden');
+                feedBtn.className = 'flex items-center space-x-2 px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-brand-600 text-white shadow-md';
+            } else if (tab === 'codepen') {
+                codepenTab.classList.remove('hidden');
+                codepenBtn.className = 'flex items-center space-x-2 px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-brand-600 text-white shadow-md';
+                runPlaygroundCode();
+            } else if (tab === 'backup') {
+                backupTab.classList.remove('hidden');
+                backupBtn.className = 'flex items-center space-x-2 px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 bg-brand-600 text-white shadow-md';
+            }
+        }
+
+        function initStandalonePlayground() {
+            document.getElementById('standalone-html').value = '<div class="card">\n  <h1>DevBoard Playground</h1>\n  <p>HTML, CSS, JSを書き換えてテストしてみましょう！</p>\n</div>';
+            document.getElementById('standalone-css').value = 'body {\n  font-family: sans-serif;\n  background: #1e293b;\n  color: white;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  height: 100vh;\n  margin: 0;\n}\n.card {\n  background: #0f172a;\n  padding: 24px;\n  border-radius: 12px;\n  box-shadow: 0 10px 25px rgba(0,0,0,0.5);\n}';
+            document.getElementById('standalone-js').value = 'console.log("Playground Ready!");';
+        }
+
+        function runPlaygroundCode() {
+            const html = document.getElementById('standalone-html').value;
+            const css = document.getElementById('standalone-css').value;
+            const js = document.getElementById('standalone-js').value;
+
+            const iframe = document.getElementById('standalone-iframe');
+            renderIntoIframe(iframe, html, css, js);
+        }
+
+        function resetPlaygroundCode() {
+            initStandalonePlayground();
+            runPlaygroundCode();
+        }
+
+        function escapeHTML(str) {
+            return (str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevBoard - 開発者＆クリエイター掲示板</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Firebase App & Realtime Database SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  <style>
+    .glass {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen font-sans flex flex-col">
+
+  <!-- ヘッダー -->
+  <header class="sticky top-0 z-30 glass border-b border-slate-200 shadow-sm">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-md">
+          <i data-lucide="message-square-code" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-lg leading-tight text-slate-900">DevBoard</h1>
+            <span id="storage-mode-badge" class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
+              LocalStorage モード
+            </span>
+          </div>
+          <p class="text-xs text-slate-500">リアルタイム共有 ＆ コード掲示板</p>
+        </div>
+      </div>
+
+      <!-- 右上アクション -->
+      <div class="flex items-center gap-2">
+        <!-- 設定ボタン -->
+        <button onclick="openSettingsModal()" class="flex items-center gap-1.5 text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg transition font-medium">
+          <i data-lucide="settings" class="w-4 h-4"></i> 設定
+        </button>
+
+        <button onclick="exportData()" class="flex items-center gap-1.5 text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg transition font-medium">
+          <i data-lucide="download" class="w-4 h-4"></i> エクスポート
+        </button>
+        <label class="flex items-center gap-1.5 text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg transition font-medium cursor-pointer">
+          <i data-lucide="upload" class="w-4 h-4"></i> インポート
+          <input type="file" id="import-file" accept=".json" class="hidden" onchange="importData(event)">
+        </label>
+      </div>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="flex-1 max-w-5xl w-full mx-auto p-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <!-- サイドバー：CodePenプレビュー ＆ 検索 -->
+    <aside class="md:col-span-1 space-y-6">
+      
+      <!-- 検索・フィルター -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <h2 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+          <i data-lucide="search" class="w-4 h-4 text-indigo-500"></i> 投稿を検索
+        </h2>
+        <input type="text" id="search-input" placeholder="キーワードやタグで検索..." oninput="renderPosts()" 
+               class="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <!-- ミニ CodePen プレイグラウンド -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[480px]">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+            <i data-lucide="code" class="w-4 h-4 text-indigo-500"></i> CodePen プレビュー
+          </h2>
+          <span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">Live</span>
+        </div>
+
+        <!-- タブ切替 -->
+        <div class="flex gap-1 bg-slate-100 p-1 rounded-lg text-xs mb-2">
+          <button onclick="switchTab('html')" id="tab-html" class="flex-1 py-1 rounded font-medium bg-white shadow-sm text-indigo-600">HTML</button>
+          <button onclick="switchTab('css')" id="tab-css" class="flex-1 py-1 rounded font-medium text-slate-600">CSS</button>
+          <button onclick="switchTab('js')" id="tab-js" class="flex-1 py-1 rounded font-medium text-slate-600">JS</button>
+        </div>
+
+        <!-- エディタエリア -->
+        <div class="flex-1 mb-2 relative">
+          <textarea id="code-html" class="code-editor w-full h-full text-xs font-mono p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none" placeholder="HTMLを入力..."></textarea>
+          <textarea id="code-css" class="code-editor w-full h-full text-xs font-mono p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none hidden" placeholder="CSSを入力..."></textarea>
+          <textarea id="code-js" class="code-editor w-full h-full text-xs font-mono p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none hidden" placeholder="JSを入力..."></textarea>
+        </div>
+
+        <button onclick="runCode()" class="w-full bg-slate-800 hover:bg-slate-900 text-white text-xs py-1.5 rounded-lg mb-2 font-medium flex items-center justify-center gap-1 transition">
+          <i data-lucide="play" class="w-3.5 h-3.5"></i> 実行・反映
+        </button>
+
+        <!-- プレビュー iframe -->
+        <div class="h-36 border border-slate-200 rounded-lg overflow-hidden bg-white">
+          <iframe id="preview-frame" class="w-full h-full border-0"></iframe>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 投稿フィード＆作成フォーム -->
+    <section class="md:col-span-2 space-y-6">
+
+      <!-- 新規投稿フォーム -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <h2 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+          <i data-lucide="pen-tool" class="w-4 h-4 text-indigo-500"></i> 新しい投稿
+        </h2>
+        
+        <form onsubmit="handlePostSubmit(event)" class="space-y-3">
+          <input type="text" id="post-author" placeholder="お名前（任意）" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <textarea id="post-content" required rows="3" placeholder="今何してる？（YouTubeやScratch URLで埋め込み表示されます）" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+          
+          <input type="text" id="post-tags" placeholder="タグ (カンマ区切り: 例 javascript, scratch)" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+
+          <!-- 画像・動画添付 & プレビュー -->
+          <div class="space-y-2">
+            <div class="flex items-center gap-3 flex-wrap">
+              <label class="flex items-center gap-1 text-xs text-slate-600 hover:text-indigo-600 cursor-pointer border border-slate-200 px-3 py-1.5 rounded-lg transition bg-slate-50">
+                <i data-lucide="image" class="w-4 h-4 text-indigo-500"></i> 画像/動画ファイルを選択
+                <input type="file" id="post-file" accept="image/*,video/*" class="hidden" onchange="handleFilePreview(event)">
+              </label>
+              <button type="button" onclick="attachCurrentCode()" class="flex items-center gap-1 text-xs text-slate-600 hover:text-indigo-600 border border-slate-200 px-3 py-1.5 rounded-lg transition bg-slate-50">
+                <i data-lucide="code-2" class="w-4 h-4 text-emerald-500"></i> CodePenコードを添付
+              </button>
+            </div>
+
+            <!-- ファイルプレビュー表示エリア -->
+            <div id="media-preview-container" class="hidden relative inline-block border border-slate-200 rounded-xl overflow-hidden max-h-48 bg-slate-50">
+              <button type="button" onclick="clearFilePreview()" class="absolute top-1 right-1 bg-slate-900/70 text-white rounded-full p-1 hover:bg-slate-900 transition">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              </button>
+              <div id="media-preview-content"></div>
+            </div>
+            <div id="code-attached-badge" class="hidden text-xs text-emerald-600 font-medium flex items-center gap-1">
+              <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> CodePenコードが添付されました
+            </div>
+          </div>
+
+          <div class="flex justify-end pt-2">
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-5 py-2 rounded-xl font-medium shadow-sm transition flex items-center gap-1.5">
+              <i data-lucide="send" class="w-3.5 h-3.5"></i> 投稿する
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 投稿一覧 -->
+      <div id="posts-list" class="space-y-4">
+        <div class="text-center py-10 text-slate-400 text-sm">読み込み中...</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ⚙️ アプリ設定モーダル -->
+  <div id="settings-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white w-full max-w-lg rounded-2xl p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <h3 class="text-sm font-semibold text-slate-800 flex items-center gap-2">
+          <i data-lucide="settings" class="w-4 h-4 text-indigo-500"></i> アプリ設定
+        </h3>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        
+        <!-- 💾 保存先ストレージ設定 -->
+        <div class="space-y-2 border-b border-slate-100 pb-3">
+          <h4 class="font-semibold text-slate-700 flex items-center gap-1">
+            <i data-lucide="hard-drive" class="w-3.5 h-3.5 text-indigo-500"></i> データ保存先
+          </h4>
+          <div class="flex gap-4 items-center">
+            <label class="flex items-center gap-1.5 cursor-pointer font-medium text-slate-700">
+              <input type="radio" name="storage-provider" value="local" id="storage-type-local" onchange="toggleStorageFields()" class="text-indigo-600">
+              LocalStorage（ローカル保存）
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer font-medium text-slate-700">
+              <input type="radio" name="storage-provider" value="firebase" id="storage-type-firebase" onchange="toggleStorageFields()" class="text-indigo-600">
+              Firebase Realtime Database
+            </label>
+          </div>
+        </div>
+
+        <!-- 🔥 Firebase 設定 (空デフォルト) -->
+        <div id="firebase-config-fields" class="space-y-2 border-b border-slate-100 pb-3">
+          <h4 class="font-semibold text-slate-700 flex items-center gap-1">
+            <i data-lucide="database" class="w-3.5 h-3.5 text-amber-500"></i> Firebase 設定
+          </h4>
+          <p class="text-[11px] text-slate-400 mb-2">GitHub等へ公開する場合はキーを直書きせず、ここで入力してください。</p>
+          <div class="space-y-2">
+            <div>
+              <label class="font-medium text-slate-600 block mb-0.5">API Key</label>
+              <input type="text" id="setting-firebase-apikey" placeholder="AIzaSy..." class="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg font-mono">
+            </div>
+            <div>
+              <label class="font-medium text-slate-600 block mb-0.5">Database URL</label>
+              <input type="text" id="setting-firebase-dburl" placeholder="https://xxx.firebaseio.com" class="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg font-mono">
+            </div>
+            <div>
+              <label class="font-medium text-slate-600 block mb-0.5">Project ID</label>
+              <input type="text" id="setting-firebase-projectid" placeholder="my-project-id" class="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg font-mono">
+            </div>
+          </div>
+        </div>
+
+        <!-- ⚡ GAS 連携設定 -->
+        <div class="space-y-2 border-b border-slate-100 pb-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-semibold text-slate-700 flex items-center gap-1">
+              <i data-lucide="file-code" class="w-3.5 h-3.5 text-emerald-500"></i> Google Apps Script (GAS) 連携
+            </h4>
+            <input type="checkbox" id="setting-gas-enable" class="w-4 h-4 text-indigo-600 rounded cursor-pointer">
+          </div>
+          <div>
+            <label class="font-medium text-slate-600 block mb-0.5">GAS Web App URL</label>
+            <input type="text" id="setting-gas-url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg font-mono">
+          </div>
+          <button type="button" onclick="testGasConnection()" class="text-[11px] text-indigo-600 hover:text-indigo-800 underline font-medium">接続テストを送信</button>
+        </div>
+
+        <!-- 🌐 プロキシ設定 -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <h4 class="font-semibold text-slate-700 flex items-center gap-1">
+              <i data-lucide="shield" class="w-3.5 h-3.5 text-indigo-500"></i> プロキシ設定
+            </h4>
+            <input type="checkbox" id="setting-proxy-enable" class="w-4 h-4 text-indigo-600 rounded cursor-pointer">
+          </div>
+          <div>
+            <label class="font-medium text-slate-600 block mb-0.5">カスタムプロキシURL</label>
+            <input type="text" id="setting-proxy-url" placeholder="https://api.allorigins.win/raw?url=" class="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg font-mono">
+          </div>
+        </div>
+
+      </div>
+
+      <div class="flex justify-between items-center pt-2 border-t border-slate-100">
+        <button onclick="resetDefaultSettings()" class="text-[11px] text-slate-500 hover:text-slate-700 underline">設定をクリア</button>
+        <div class="flex gap-2">
+          <button onclick="closeSettingsModal()" class="text-xs px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600">キャンセル</button>
+          <button onclick="saveSettings()" class="text-xs px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium">保存して適用</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 編集用モーダル -->
+  <div id="edit-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white w-full max-w-lg rounded-2xl p-5 shadow-xl space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <h3 class="text-sm font-semibold text-slate-800">投稿を編集</h3>
+        <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <input type="hidden" id="edit-post-id">
+      <textarea id="edit-post-content" rows="4" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeEditModal()" class="text-xs px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600">キャンセル</button>
+        <button onclick="savePostEdit()" class="text-xs px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium">更新を保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // デフォルト設定定数 (GitHub公開用にAPIキー類はデフォルト空文字列)
+    const DEFAULT_CONFIG = {
+      firebase: {
+        apiKey: "",
+        databaseURL: "",
+        projectId: ""
+      },
+      proxyUrl: "https://api.allorigins.win/raw?url="
+    };
+
+    // ストレージ・API設定
+    let storageType = localStorage.getItem('devboard_storage_type') || 'local'; // 'local' または 'firebase'
+    let firebaseApiKey = localStorage.getItem('devboard_fb_apikey') || DEFAULT_CONFIG.firebase.apiKey;
+    let firebaseDbUrl = localStorage.getItem('devboard_fb_dburl') || DEFAULT_CONFIG.firebase.databaseURL;
+    let firebaseProjectId = localStorage.getItem('devboard_fb_projectid') || DEFAULT_CONFIG.firebase.projectId;
+
+    let useProxy = localStorage.getItem('devboard_use_proxy') === 'true';
+    let customProxyUrl = localStorage.getItem('devboard_proxy_url') || DEFAULT_CONFIG.proxyUrl;
+
+    let useGas = localStorage.getItem('devboard_use_gas') === 'true';
+    let gasUrl = localStorage.getItem('devboard_gas_url') || '';
+
+    // 内部データ状態
+    let postsData = {};
+    let attachedCode = null;
+    let selectedMediaBase64 = null;
+    let selectedMediaType = null;
+
+    // Firebase 参照変数
+    let postsRef = null;
+    let db = null;
+
+    // --- ストレージ初期化 ---
+    function initDatabase() {
+      // Firebaseの設定が入力されており、かつfirebaseモードが選択されている場合
+      if (storageType === 'firebase' && firebaseApiKey && firebaseDbUrl) {
+        try {
+          if (firebase.apps.length) {
+            firebase.app().delete();
+          }
+          firebase.initializeApp({
+            apiKey: firebaseApiKey,
+            databaseURL: firebaseDbUrl,
+            projectId: firebaseProjectId
+          });
+          db = firebase.database();
+          postsRef = db.ref('posts');
+
+          postsRef.on('value', (snapshot) => {
+            postsData = snapshot.val() || {};
+            renderPosts();
+          });
+
+          updateStorageBadge('Firebase リアルタイムDB', 'bg-amber-100 text-amber-800');
+          return;
+        } catch (e) {
+          console.error("Firebase接続エラー:", e);
+          alert("Firebaseの初期化に失敗しました。LocalStorageモードに切り替えます。");
+        }
+      }
+
+      // フォールバック / LocalStorage モード
+      storageType = 'local';
+      updateStorageBadge('LocalStorage モード', 'bg-slate-200 text-slate-700');
+      loadFromLocalStorage();
+    }
+
+    function updateStorageBadge(text, colorClasses) {
+      const badge = document.getElementById('storage-mode-badge');
+      if (badge) {
+        badge.textContent = text;
+        badge.className = `text-[10px] font-medium px-2 py-0.5 rounded-full ${colorClasses}`;
+      }
+    }
+
+    function loadFromLocalStorage() {
+      const saved = localStorage.getItem('devboard_local_posts');
+      postsData = saved ? JSON.parse(saved) : {};
+      renderPosts();
+    }
+
+    function saveToLocalStorage() {
+      localStorage.setItem('devboard_local_posts', JSON.stringify(postsData));
+      renderPosts();
+    }
+
+    // --- STREAMING_CHUNK: Managing modal states and configurations ---
+    function openSettingsModal() {
+      if (storageType === 'firebase') {
+        document.getElementById('storage-type-firebase').checked = true;
+      } else {
+        document.getElementById('storage-type-local').checked = true;
+      }
+
+      document.getElementById('setting-firebase-apikey').value = firebaseApiKey;
+      document.getElementById('setting-firebase-dburl').value = firebaseDbUrl;
+      document.getElementById('setting-firebase-projectid').value = firebaseProjectId;
+
+      document.getElementById('setting-gas-enable').checked = useGas;
+      document.getElementById('setting-gas-url').value = gasUrl;
+
+      document.getElementById('setting-proxy-enable').checked = useProxy;
+      document.getElementById('setting-proxy-url').value = customProxyUrl;
+
+      toggleStorageFields();
+      document.getElementById('settings-modal').classList.remove('hidden');
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settings-modal').classList.add('hidden');
+    }
+
+    function toggleStorageFields() {
+      const isFb = document.getElementById('storage-type-firebase').checked;
+      const fbFields = document.getElementById('firebase-config-fields');
+      if (isFb) {
+        fbFields.classList.remove('opacity-50');
+      } else {
+        fbFields.classList.add('opacity-50');
+      }
+    }
+
+    function resetDefaultSettings() {
+      document.getElementById('storage-type-local').checked = true;
+      document.getElementById('setting-firebase-apikey').value = '';
+      document.getElementById('setting-firebase-dburl').value = '';
+      document.getElementById('setting-firebase-projectid').value = '';
+
+      document.getElementById('setting-gas-enable').checked = false;
+      document.getElementById('setting-gas-url').value = '';
+
+      document.getElementById('setting-proxy-enable').checked = false;
+      document.getElementById('setting-proxy-url').value = DEFAULT_CONFIG.proxyUrl;
+
+      toggleStorageFields();
+    }
+
+    function saveSettings() {
+      storageType = document.querySelector('input[name="storage-provider"]:checked').value;
+      firebaseApiKey = document.getElementById('setting-firebase-apikey').value.trim();
+      firebaseDbUrl = document.getElementById('setting-firebase-dburl').value.trim();
+      firebaseProjectId = document.getElementById('setting-firebase-projectid').value.trim();
+
+      useGas = document.getElementById('setting-gas-enable').checked;
+      gasUrl = document.getElementById('setting-gas-url').value.trim();
+
+      useProxy = document.getElementById('setting-proxy-enable').checked;
+      customProxyUrl = document.getElementById('setting-proxy-url').value.trim() || DEFAULT_CONFIG.proxyUrl;
+
+      localStorage.setItem('devboard_storage_type', storageType);
+      localStorage.setItem('devboard_fb_apikey', firebaseApiKey);
+      localStorage.setItem('devboard_fb_dburl', firebaseDbUrl);
+      localStorage.setItem('devboard_fb_projectid', firebaseProjectId);
+
+      localStorage.setItem('devboard_use_gas', useGas);
+      localStorage.setItem('devboard_gas_url', gasUrl);
+
+      localStorage.setItem('devboard_use_proxy', useProxy);
+      localStorage.setItem('devboard_proxy_url', customProxyUrl);
+
+      closeSettingsModal();
+      initDatabase();
+    }
+
+    function getProxyUrl(url) {
+      if (!useProxy) return url;
+      return `${customProxyUrl}${encodeURIComponent(url)}`;
+    }
+
+    // --- GAS 連携処理 ---
+    function sendToGas(payload) {
+      if (!useGas || !gasUrl) return;
+      fetch(gasUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).catch(err => console.error("GAS送信失敗:", err));
+    }
+
+    function testGasConnection() {
+      const testUrl = document.getElementById('setting-gas-url').value.trim();
+      if (!testUrl) {
+        alert("GAS URLを入力してください");
+        return;
+      }
+      fetch(testUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test', message: 'Connection Test' })
+      }).then(() => alert("テストリクエストを送信しました（no-cors）"))
+        .catch(err => alert("送信エラー: " + err));
+    }
+
+    // --- STREAMING_CHUNK: Rendering post feed and embeds ---
+    // --- 投稿一覧の描画 ---
+    function renderPosts() {
+      const listEl = document.getElementById('posts-list');
+      const searchQuery = document.getElementById('search-input').value.toLowerCase();
+      
+      const postsArray = Object.keys(postsData).map(key => ({
+        id: key,
+        ...postsData[key]
+      })).sort((a, b) => b.timestamp - a.timestamp);
+
+      const filtered = postsArray.filter(post => {
+        const contentMatch = (post.content || '').toLowerCase().includes(searchQuery);
+        const authorMatch = (post.author || '').toLowerCase().includes(searchQuery);
+        const tagMatch = (post.tags || []).some(t => t.toLowerCase().includes(searchQuery));
+        return contentMatch || authorMatch || tagMatch;
+      });
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `<div class="text-center py-12 bg-white rounded-2xl border border-slate-200 text-slate-400 text-sm">投稿が見つかりません</div>`;
+        lucide.createIcons();
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(post => {
+        const formattedContent = parseUrlsAndEmbeds(post.content);
+        const dateStr = new Date(post.timestamp).toLocaleString('ja-JP');
+        const isEditedTag = post.isEdited ? '<span class="text-[10px] text-slate-400 font-normal">（編集済み）</span>' : '';
+
+        const tagsHtml = (post.tags || []).map(t => `<span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">#${t}</span>`).join(' ');
+
+        let mediaHtml = '';
+        if (post.media) {
+          const mediaSrc = getProxyUrl(post.media.data);
+          if (post.media.type.startsWith('image/')) {
+            mediaHtml = `<div class="mt-3 rounded-xl overflow-hidden border border-slate-100 max-h-80"><img src="${mediaSrc}" class="w-full h-auto object-cover max-h-80"></div>`;
+          } else if (post.media.type.startsWith('video/')) {
+            mediaHtml = `<div class="mt-3 rounded-xl overflow-hidden border border-slate-100 max-h-80 bg-black"><video src="${mediaSrc}" controls class="w-full h-auto max-h-80"></video></div>`;
+          }
+        }
+
+        let codeHtml = '';
+        if (post.code) {
+          codeHtml = `
+            <div class="mt-3 p-3 bg-slate-900 text-slate-100 rounded-xl text-xs font-mono">
+              <div class="flex justify-between items-center mb-2 pb-1 border-b border-slate-700 text-slate-400">
+                <span>添付コードプレビュー</span>
+                <button onclick="loadCodeToEditor('${post.id}')" class="text-[10px] text-indigo-400 hover:text-indigo-300">エディタに読み込む</button>
+              </div>
+              <iframe id="iframe-${post.id}" class="w-full h-32 bg-white rounded border-0"></iframe>
+            </div>
+          `;
+        }
+
+        const comments = post.comments ? Object.keys(post.comments).map(k => ({ id: k, ...post.comments[k] })) : [];
+        const commentsHtml = comments.map(c => `
+          <div class="bg-slate-50 p-2.5 rounded-xl text-xs space-y-1">
+            <div class="flex justify-between text-slate-500 font-medium text-[11px]">
+              <span>${escapeHtml(c.author || '匿名')}</span>
+              <span>${new Date(c.timestamp).toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'})}</span>
+            </div>
+            <p class="text-slate-700">${parseUrlsAndEmbeds(c.content)}</p>
+          </div>
+        `).join('');
+
+        return `
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            <div class="flex justify-between items-start">
+              <div>
+                <span class="font-semibold text-sm text-slate-800">${escapeHtml(post.author || '名無しさん')}</span>
+                <span class="text-xs text-slate-400 ml-2">${dateStr}</span>
+                ${isEditedTag}
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="openEditModal('${post.id}')" class="text-slate-400 hover:text-indigo-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                <button onclick="deletePost('${post.id}')" class="text-slate-400 hover:text-red-500 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+              </div>
+            </div>
+
+            <div class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">${formattedContent}</div>
+
+            ${mediaHtml}
+            ${codeHtml}
+
+            ${tagsHtml ? `<div class="flex flex-wrap gap-1 pt-1">${tagsHtml}</div>` : ''}
+
+            <div class="pt-3 border-t border-slate-100 space-y-2">
+              <div class="space-y-2">${commentsHtml}</div>
+              <form onsubmit="handleCommentSubmit(event, '${post.id}')" class="flex gap-2 pt-1">
+                <input type="text" name="comment" placeholder="コメントを書く..." required class="flex-1 text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white text-xs px-3 py-1.5 rounded-lg transition font-medium">返信</button>
+              </form>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+
+      filtered.forEach(post => {
+        if (post.code) {
+          const iframe = document.getElementById(`iframe-${post.id}`);
+          if (iframe) {
+            const doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(`${post.code.html || ''}<style>${post.code.css || ''}</style><script>${post.code.js || ''}<\/script>`);
+            doc.close();
+          }
+        }
+      });
+    }
+
+    // --- STREAMING_CHUNK: Handling CRUD operations for posts and comments ---
+    // --- 投稿・CRUD処理 ---
+    function handlePostSubmit(e) {
+      e.preventDefault();
+      const author = document.getElementById('post-author').value.trim();
+      const content = document.getElementById('post-content').value.trim();
+      const tagsStr = document.getElementById('post-tags').value.trim();
+      const tags = tagsStr ? tagsStr.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+      const newPost = {
+        author: author || '名無しさん',
+        content: content,
+        tags: tags,
+        timestamp: Date.now(),
+        isEdited: false
+      };
+
+      if (selectedMediaBase64) {
+        newPost.media = { data: selectedMediaBase64, type: selectedMediaType };
+      }
+
+      if (attachedCode) {
+        newPost.code = attachedCode;
+      }
+
+      if (storageType === 'firebase' && postsRef) {
+        postsRef.push(newPost, (err) => {
+          if (!err) finishPostSubmit(e, newPost);
+        });
+      } else {
+        const id = 'post_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+        postsData[id] = newPost;
+        saveToLocalStorage();
+        finishPostSubmit(e, newPost);
+      }
+    }
+
+    function finishPostSubmit(e, newPost) {
+      sendToGas({ action: 'post', data: newPost });
+      e.target.reset();
+      clearFilePreview();
+      attachedCode = null;
+      document.getElementById('code-attached-badge').classList.add('hidden');
+    }
+
+    function handleCommentSubmit(e, postId) {
+      e.preventDefault();
+      const input = e.target.elements['comment'];
+      const content = input.value.trim();
+      if (!content) return;
+
+      const commentData = {
+        author: '名無しさん',
+        content: content,
+        timestamp: Date.now()
+      };
+
+      if (storageType === 'firebase' && db) {
+        db.ref(`posts/${postId}/comments`).push(commentData, () => {
+          sendToGas({ action: 'comment', postId: postId, data: commentData });
+          input.value = '';
+        });
+      } else {
+        if (!postsData[postId].comments) postsData[postId].comments = {};
+        const cid = 'comment_' + Date.now();
+        postsData[postId].comments[cid] = commentData;
+        saveToLocalStorage();
+        sendToGas({ action: 'comment', postId: postId, data: commentData });
+        input.value = '';
+      }
+    }
+
+    function deletePost(postId) {
+      if (confirm('この投稿を削除しますか？')) {
+        if (storageType === 'firebase' && db) {
+          db.ref(`posts/${postId}`).remove();
+        } else {
+          delete postsData[postId];
+          saveToLocalStorage();
+        }
+      }
+    }
+
+    function openEditModal(postId) {
+      const post = postsData[postId];
+      if (!post) return;
+      document.getElementById('edit-post-id').value = postId;
+      document.getElementById('edit-post-content').value = post.content || '';
+      document.getElementById('edit-modal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-modal').classList.add('hidden');
+    }
+
+    function savePostEdit() {
+      const postId = document.getElementById('edit-post-id').value;
+      const newContent = document.getElementById('edit-post-content').value.trim();
+      if (!newContent) return;
+
+      if (storageType === 'firebase' && db) {
+        db.ref(`posts/${postId}`).update({
+          content: newContent,
+          isEdited: true
+        }, () => {
+          closeEditModal();
+        });
+      } else {
+        if (postsData[postId]) {
+          postsData[postId].content = newContent;
+          postsData[postId].isEdited = true;
+          saveToLocalStorage();
+        }
+        closeEditModal();
+      }
+    }
+
+    // --- CodePen機能 ---
+    function switchTab(tab) {
+      ['html', 'css', 'js'].forEach(t => {
+        document.getElementById(`code-${t}`).classList.add('hidden');
+        document.getElementById(`tab-${t}`).className = 'flex-1 py-1 rounded font-medium text-slate-600';
+      });
+      document.getElementById(`code-${tab}`).classList.remove('hidden');
+      document.getElementById(`tab-${tab}`).className = 'flex-1 py-1 rounded font-medium bg-white shadow-sm text-indigo-600';
+    }
+
+    function runCode() {
+      const html = document.getElementById('code-html').value;
+      const css = `<style>${document.getElementById('code-css').value}</style>`;
+      const js = `<script>${document.getElementById('code-js').value}<\/script>`;
+      
+      const iframe = document.getElementById('preview-frame').contentWindow.document;
+      iframe.open();
+      iframe.write(html + css + js);
+      iframe.close();
+    }
+
+    function attachCurrentCode() {
+      attachedCode = {
+        html: document.getElementById('code-html').value,
+        css: document.getElementById('code-css').value,
+        js: document.getElementById('code-js').value
+      };
+      document.getElementById('code-attached-badge').classList.remove('hidden');
+    }
+
+    function loadCodeToEditor(postId) {
+      const post = postsData[postId];
+      if (!post || !post.code) return;
+      document.getElementById('code-html').value = post.code.html || '';
+      document.getElementById('code-css').value = post.code.css || '';
+      document.getElementById('code-js').value = post.code.js || '';
+      runCode();
+    }
+
+    // --- STREAMING_CHUNK: Managing file handling and data export/import ---
+    // --- ファイル選択 ＆ プレビュー ---
+    function handleFilePreview(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (file.size > 5 * 1024 * 1024) {
+        alert('ファイルサイズは5MB以下にしてください');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        selectedMediaBase64 = event.target.result;
+        selectedMediaType = file.type;
+
+        const previewContainer = document.getElementById('media-preview-container');
+        const previewContent = document.getElementById('media-preview-content');
+        previewContainer.classList.remove('hidden');
+
+        if (file.type.startsWith('image/')) {
+          previewContent.innerHTML = `<img src="${selectedMediaBase64}" class="h-32 w-auto object-contain">`;
+        } else if (file.type.startsWith('video/')) {
+          previewContent.innerHTML = `<video src="${selectedMediaBase64}" controls class="h-32 w-auto max-w-xs bg-black"></video>`;
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearFilePreview() {
+      selectedMediaBase64 = null;
+      selectedMediaType = null;
+      document.getElementById('post-file').value = '';
+      document.getElementById('media-preview-container').classList.add('hidden');
+    }
+
+    // --- エクスポート / インポート ---
+    function exportData() {
+      const jsonStr = JSON.stringify(postsData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `devboard_backup_${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importData(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        try {
+          const imported = JSON.parse(event.target.result);
+          if (confirm('既存の投稿データと統合（上書き）してロードしますか？')) {
+            if (storageType === 'firebase' && db) {
+              db.ref('posts').set(imported, () => {
+                alert('インポートが完了しました！');
+              });
+            } else {
+              postsData = imported;
+              saveToLocalStorage();
+              alert('インポートが完了しました！');
+            }
+          }
+        } catch (err) {
+          alert('JSONファイルの読み込みに失敗しました');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // --- ユーティリティ (埋め込み解析) ---
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function parseUrlsAndEmbeds(text) {
+      const escaped = escapeHtml(text);
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+
+      return escaped.replace(urlRegex, (rawUrl) => {
+        let targetUrl = rawUrl;
+
+        // 1. Scratch プロジェクト埋め込み
+        const scratchMatch = targetUrl.match(/scratch\.mit\.edu\/projects\/([0-9]+)/);
+        if (scratchMatch) {
+          const projectId = scratchMatch[1];
+          return `<br><iframe src="https://scratch.mit.edu/projects/${projectId}/embed" allowtransparency="true" width="485" height="402" frameborder="0" scrolling="no" allowfullscreen class="my-2 rounded-xl max-w-full"></iframe><br>`;
+        }
+
+        // 2. YouTube 動画埋め込み
+        const ytMatch = targetUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([a-zA-Z0-9_-]{11})/);
+        if (ytMatch) {
+          return `<br><iframe width="100%" height="240" src="https://www.youtube-nocookie.com/embed/${ytMatch[1]}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen class="my-2 rounded-xl"></iframe><br>`;
+        }
+
+        // 3. 通常の外部リンク (プロキシ適用対応)
+        if (useProxy) {
+          targetUrl = getProxyUrl(rawUrl);
+        }
+
+        return `<a href="${targetUrl}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline hover:text-indigo-800">${rawUrl}</a>`;
+      });
+    }
+
+    // アプリ起動時に初期化
+    initDatabase();
+    lucide.createIcons();
+  </script>
+</body>
+</html>
